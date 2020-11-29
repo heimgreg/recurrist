@@ -9,6 +9,14 @@ class TodoistWrapper:
             syncres = self.api.sync()
             if 'error' in syncres:
                 raise Exception(syncres["error"])
+            print("Successfully synced with Todoist")
         except Exception as e:
             print("Failed to sync with todoist: " + str(e))
             raise
+
+    def find_label_by_name(self, name):
+        labels = self.api.labels.all()
+        for label in labels:
+            if label['name'] == name:
+                return label
+        return None
