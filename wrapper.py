@@ -29,7 +29,7 @@ class TodoistWrapper:
         completed = self.api.completed.get_all()
         completed["items"] = [x for x in completed["items"]
                               if datetime.fromisoformat(
-                                  x["completed_date"][:-1] + '+00:00') > time]
+                                  x["completed_date"][:-1]) > time]
         return completed["items"]
 
     def get_task_details(self, task_id):

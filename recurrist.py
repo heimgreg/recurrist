@@ -10,15 +10,19 @@ With this module, tasks in Todoist can be
 import sys
 import json
 from os import environ
+from datetime import datetime
 from wrapper import TodoistWrapper
 
 
-def get_config():
+__config = {}
+__wrapper = None
+
+
+def load_config():
     """Load configuration from config file config.json."""
-    config = {}
+    global __config
     with open("config.json", "r") as config_file:
-        config = json.load(config_file)
-    return config
+        __config = json.load(config_file)
 
 
 def get_todoist_token():
@@ -31,17 +35,50 @@ def get_todoist_token():
 
 def init():
     """Initialize Recurrist."""
+    global __wrapper
     try:
         token = get_todoist_token()
-        wrapper = TodoistWrapper(token)
-        return wrapper
+        __wrapper = TodoistWrapper(token)
+        load_config()
     except Exception as e:
         print("Error while initializing Recurrist: " + str(e))
         raise
 
 
+def read_time_of_last_run():
+    """Read timestamp of last run from file."""
+    content = None
+    try:
+        with open("lastrun.json", "r") as fh:
+            content = json.load(fh)
+    except Exception:
+        pass
+    if content is not None:
+        return datetime.fromisoformat(content['last_run'])
+    return None
+
+
+def write_time_of_last_run(time):
+    """Write timestamp of current run to file."""
+    isinstance(time, datetime)
+    content = {}
+    content['last_run'] = time.isoformat()
+    with open("lastrun.json", "w") as fh:
+        json.dump(content, fh)
+
+
 def recreate_completed_tasks():
     """Recreate task that were completed since last run."""
+    last_run = read_time_of_last_run()
+    current_time = datetime.utcnow()
+    completed = __wrapper.get_completed_items_since(last_run)
+    print(completed)
+    write_time_of_last_run(current_time)
+    pass
+
+
+def update_tasks():
+    """Update tasks if a trigger matches."""
     pass
 
 
@@ -51,9 +88,11 @@ def main():
     #     wrapper = init()
     # except Exception:
     #     sys.exit(1)
+    # global __config
 
-    config = get_config()
-    print(config)
+    init()
+    recreate_completed_tasks()
+    update_tasks()
 
 
 if __name__ == '__main__':
