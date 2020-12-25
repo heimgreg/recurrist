@@ -11,11 +11,11 @@ import sys
 import json
 from os import environ
 from datetime import datetime
-from wrapper import TodoistWrapper
+from todoist.api import TodoistAPI
 
 
 __config = {}
-__wrapper = None
+__todoist = None
 
 
 def load_config():
@@ -33,13 +33,26 @@ def get_todoist_token():
     return token
 
 
+def connect(token):
+    """Connect to Todoist API."""
+    global __todoist
+    __todoist = TodoistAPI(token)
+    try:
+        syncres = __todoist.sync()
+        if 'error' in syncres:
+            raise Exception(syncres["error"])
+        print("Successfully synced with Todoist")
+    except Exception as e:
+        print("Failed to sync with todoist: " + str(e))
+        raise
+
+
 def init():
     """Initialize Recurrist."""
-    global __wrapper
     try:
-        token = get_todoist_token()
-        __wrapper = TodoistWrapper(token)
         load_config()
+        token = get_todoist_token()
+        connect(token)
     except Exception as e:
         print("Error while initializing Recurrist: " + str(e))
         raise
@@ -67,11 +80,22 @@ def write_time_of_last_run(time):
         json.dump(content, fh)
 
 
+def get_completed_items_since(time):
+    """Return list of completed tasks since given timestamp."""
+    if type(time) != datetime:
+        raise TypeError('Expected datetime, got ' + type(time).__name__ + '.')
+    completed = __todoist.completed.get_all()
+    completed["items"] = [x for x in completed["items"]
+                          if datetime.fromisoformat(
+                              x["completed_date"][:-1]) > time]
+    return completed["items"]
+
+
 def recreate_completed_tasks():
     """Recreate task that were completed since last run."""
     last_run = read_time_of_last_run()
     current_time = datetime.utcnow()
-    completed = __wrapper.get_completed_items_since(last_run)
+    completed = get_completed_items_since(last_run)
     print(completed)
     write_time_of_last_run(current_time)
     pass
