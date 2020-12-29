@@ -27,6 +27,55 @@ def load_config():
         __config = json.load(config_file)
 
 
+def replace_names_in_config():
+    """Find labels and projects and store them.
+
+    The string from the configuration are replaced by
+    their equivalent todoist objects.
+    """
+    def unknown_label(name):
+        raise Exception("Unknown label '" + name + "' in configuration!")
+
+    def unknown_project(name):
+        raise Exception("Unknown project '" + name + "' in configuration!")
+
+    for task in __config["tasks"]:
+        if "labels" in task["filter"].keys():
+            for i in range(len(task["filter"]["labels"])):
+                label = find_label_by_name(task["filter"]["labels"][i])
+                if label is None:
+                    unknown_label(task["filter"]["labels"][i])
+                task["filter"]["labels"][i] = label
+        if "project" in task["filter"].keys():
+            project = find_project_by_name(task["filter"]["project"])
+            if project is None:
+                unknown_project(task["filter"]["project"])
+            task["filter"]["project"] = project
+        for action in task["actions"]:
+            if "add_label" in action["action"].keys():
+                label = find_label_by_name(action["action"]["add_label"])
+                if label is None:
+                    unknown_label(action["action"]["add_label"])
+                action["action"]["add_label"] = label
+        if "skip_label_on_recreate" in task.keys():
+            label = find_label_by_name(task["skip_label_on_recreate"])
+            if label is None:
+                unknown_label(task["skip_label_on_recreate"])
+            task["skip_label_on_recreate"] = label
+
+
+def find_label_by_name(name):
+    """Find label by its name."""
+    label = __todoist.labels.all(lambda x: x["name"] == name)
+    return label[0] if len(label) > 0 else None
+
+
+def find_project_by_name(name):
+    """Find project by its name."""
+    project = __todoist.projects.all(lambda x: x["name"] == name)
+    return project[0] if len(project) > 0 else None
+
+
 def get_todoist_token():
     """Load Todoist API token from environment variable TODOIST_TOKEN."""
     token = environ.get('TODOIST_TOKEN')
@@ -57,6 +106,7 @@ def init():
         load_config()
         token = get_todoist_token()
         connect(token)
+        replace_names_in_config()
     except Exception as e:
         print("Error while initializing Recurrist: " + str(e))
         raise
@@ -90,26 +140,48 @@ def get_completed_items_since(time):
     """Return list of completed tasks since given timestamp."""
     if not isinstance(time, datetime):
         raise TypeError('Expected datetime, got ' + type(time).__name__ + '.')
-    completed = __todoist.completed.get_all()
-    completed["items"] = [x for x in completed["items"]
-                          if datetime.fromisoformat(
-                              x["completed_date"][:-1]) > time]
+    completed = __todoist.completed.get_all(
+            since=time.strftime("%Y-%m-%dT%H:%M"))
     print("Found "
           + str(len(completed["items"]))
           + " completed tasks since "
           + str(time))
-    return completed["items"]
+    tasks = []
+    for task in completed["items"]:
+        tasks.append(__todoist.items.get_by_id(task["task_id"]))
+    return tasks
 
 
 def recreate_completed_tasks():
     """Recreate task that were completed since last run."""
+
+    def matches(task, config):
+        if "labels" in config["filter"].keys():
+            for label in config["filter"]["labels"]:
+                if label["id"] not in task["labels"]:
+                    return False
+        if "project" in config["filter"].keys():
+            if config["filter"]["project"]["id"] != task["project_id"]:
+                return False
+        return True
+
     last_run = read_time_of_last_run()
     current_time = datetime.utcnow()
     completed = get_completed_items_since(last_run)
-    print(completed)
-    # TODO Check if completed tasks match tasks from config file
-    write_time_of_last_run(current_time)
-    pass
+    for completed_task in completed:
+        recreate_task = False
+        for tasktype in __config["tasks"]:
+            if not tasktype["recreate_when_completed"]:
+                continue
+            if matches(completed_task, tasktype):
+                recreate_task = True
+                break
+        if recreate_task:
+            print("Recreating task '" + completed_task["content"] + "'.")
+            # TODO Recreate task here
+            pass
+    # Comment out so we always have enough tasks for our tests
+    # write_time_of_last_run(current_time)
 
 
 def update_tasks():
@@ -121,12 +193,6 @@ def update_tasks():
 
 def main():
     """Recurrist's main function."""
-    # try:
-    #     wrapper = init()
-    # except Exception:
-    #     sys.exit(1)
-    # global __config
-
     try:
         init()
         recreate_completed_tasks()
