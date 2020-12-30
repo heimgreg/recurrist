@@ -16,6 +16,7 @@ from todoist.api import TodoistAPI
 
 __config = {}
 __todoist = None
+__dry = True
 
 
 def load_config():
@@ -170,18 +171,31 @@ def recreate_completed_tasks():
     completed = get_completed_items_since(last_run)
     for completed_task in completed:
         recreate_task = False
+        skip_label = None
         for tasktype in __config["tasks"]:
             if not tasktype["recreate_when_completed"]:
                 continue
             if matches(completed_task, tasktype):
                 recreate_task = True
+                if "skip_label_on_recreate" in tasktype.keys():
+                    skip_label = tasktype["skip_label_on_recreate"]
                 break
         if recreate_task:
-            print("Recreating task '" + completed_task["content"] + "'.")
-            # TODO Recreate task here
-            pass
-    # Comment out so we always have enough tasks for our tests
-    # write_time_of_last_run(current_time)
+            print("Recreating task '" + completed_task["content"] + "'")
+            labels = completed_task["labels"]
+            if skip_label["id"] in labels:
+                labels.remove(skip_label["id"])
+                print("Skipping label '" + skip_label["name"] + "'")
+            new_task = __todoist.items.add(
+                    completed_task["content"],
+                    project_id=completed_task["project_id"],
+                    section_id=completed_task["section_id"],
+                    labels=labels)
+            print(new_task)
+            if not __dry:
+                __todoist.commit()
+    if not __dry:
+        write_time_of_last_run(current_time)
 
 
 def update_tasks():
