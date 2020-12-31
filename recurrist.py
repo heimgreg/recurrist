@@ -153,19 +153,28 @@ def get_completed_items_since(time):
     return tasks
 
 
+def matches(task, config):
+    """Check if a task matches a configured filter."""
+    if "labels" in config["filter"].keys():
+        for label in config["filter"]["labels"]:
+            if label["id"] not in task["labels"]:
+                return False
+    if "project" in config["filter"].keys():
+        if config["filter"]["project"]["id"] != task["project_id"]:
+            return False
+    return True
+
+
+def make_filter(config):
+    """Return filter function for finding tasks matching the config."""
+    def filt(task):
+        return matches(task, config)
+
+    return filt
+
+
 def recreate_completed_tasks():
     """Recreate task that were completed since last run."""
-
-    def matches(task, config):
-        if "labels" in config["filter"].keys():
-            for label in config["filter"]["labels"]:
-                if label["id"] not in task["labels"]:
-                    return False
-        if "project" in config["filter"].keys():
-            if config["filter"]["project"]["id"] != task["project_id"]:
-                return False
-        return True
-
     last_run = read_time_of_last_run()
     current_time = datetime.utcnow()
     completed = get_completed_items_since(last_run)
@@ -203,16 +212,7 @@ def update_tasks():
     # TODO Loop over all uncompleted tasks and check if any trigger matches
     # If trigger matches and properties are not updated yet, update task
     for tasktype in __config["tasks"]:
-        def filt(x):
-            if "labels" in tasktype["filter"].keys():
-                for label in tasktype["filter"]["labels"]:
-                    if label["id"] not in x["labels"]:
-                        return False
-            if "project" in tasktype["filter"].keys():
-                if tasktype["filter"]["project"]["id"] != x["project_id"]:
-                    return False
-            return True
-
+        filt = make_filter(tasktype)
         tasks = __todoist.items.all(filt)
         for task in tasks:
             for action in tasktype["actions"]:
