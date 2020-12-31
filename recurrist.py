@@ -202,7 +202,21 @@ def update_tasks():
     """Update tasks if a trigger matches."""
     # TODO Loop over all uncompleted tasks and check if any trigger matches
     # If trigger matches and properties are not updated yet, update task
-    pass
+    for tasktype in __config["tasks"]:
+        def filt(x):
+            if "labels" in tasktype["filter"].keys():
+                for label in tasktype["filter"]["labels"]:
+                    if label["id"] not in x["labels"]:
+                        return False
+            if "project" in tasktype["filter"].keys():
+                if tasktype["filter"]["project"]["id"] != x["project_id"]:
+                    return False
+            return True
+
+        tasks = __todoist.items.all(filt)
+        for task in tasks:
+            for action in tasktype["actions"]:
+                pass
 
 
 def main():
