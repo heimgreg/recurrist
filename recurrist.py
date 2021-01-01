@@ -243,13 +243,42 @@ def recreate_completed_tasks():
 
 def perform_action(task, action):
     """Update task according to defined action."""
-    pass
+    if "add_label" in action.keys():
+        labels = task["labels"]
+        if action["add_label"]["id"] not in labels:
+            labels.append(action["add_label"]["id"])
+            print("Updating task '"
+                  + task["content"]
+                  + "': Adding label '"
+                  + action["add_label"]["id"]
+                  + "'.")
+            task.update(labels=labels)
+        else:
+            print("Task '"
+                  + task["content"]
+                  + "' already has label '"
+                  + action["add_label"]["id"]
+                  + "'.")
+    if "increase_priority" in action.keys():
+        current_prio = task["priority"]
+        # p1 has value 4 in Todoist API
+        new_prio = 5 - action["increase_priority"]
+        if current_prio < new_prio:
+            print("Updating task '"
+                  + task["content"]
+                  + "': Increasing priority from p"
+                  + str(5 - current_prio)
+                  + " to p" + str(5 - new_prio) + ".")
+            task.update(priority=new_prio)
+        else:
+            print("Task '"
+                  + task["content"]
+                  + "' already has priority p"
+                  + str(5 - new_prio) + ".")
 
 
 def update_tasks():
     """Update tasks if a trigger matches."""
-    # TODO Loop over all uncompleted tasks and check if any trigger matches
-    # If trigger matches and properties are not updated yet, update task
     for tasktype in __config["tasks"]:
         filt = make_filter(tasktype)
         tasks = __todoist.items.all(filt)
