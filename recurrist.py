@@ -10,7 +10,8 @@ With this module, tasks in Todoist can be
 import sys
 import json
 from os import environ
-from datetime import datetime
+from datetime import datetime, date, timedelta
+from dateutil import parser
 from todoist.api import TodoistAPI
 from jsonschema import validate
 
@@ -85,6 +86,12 @@ def find_project_by_name(name):
     """Find project by its name."""
     project = __todoist.projects.all(lambda x: x["name"] == name)
     return project[0] if len(project) > 0 else None
+
+
+def parse_todoist_datetime(timestring):
+    """Parse datetime string from to todoist's format to datetime object."""
+    dt = parser.isoparse(timestring)
+    return dt
 
 
 def get_todoist_token():
@@ -183,6 +190,24 @@ def make_filter(config):
     return filt
 
 
+def triggers(task, trigger):
+    """Check if task matches trigger conditions."""
+    if "days_since_creation" in trigger.keys():
+        creation = parse_todoist_datetime(task["date_added"])
+        trigger_date = creation.date() + timedelta(
+                days=trigger["days_since_creation"])
+        if date.today() >= trigger_date:
+            return True
+    if "days_until_due" in trigger.keys():
+        if task["due"] is not None:
+            due = parse_todoist_datetime(task["due"]["date"])
+            trigger_date = due.date() - timedelta(
+                    days=trigger["days_until_due"])
+            if date.today() >= trigger_date:
+                return True
+    return False
+
+
 def recreate_completed_tasks():
     """Recreate task that were completed since last run."""
     last_run = read_time_of_last_run()
@@ -211,10 +236,14 @@ def recreate_completed_tasks():
                     section_id=completed_task["section_id"],
                     labels=labels)
             print(new_task)
-            if not __dry:
-                __todoist.commit()
     if not __dry:
         write_time_of_last_run(current_time)
+        __todoist.commit()
+
+
+def perform_action(task, action):
+    """Update task according to defined action."""
+    pass
 
 
 def update_tasks():
@@ -226,7 +255,10 @@ def update_tasks():
         tasks = __todoist.items.all(filt)
         for task in tasks:
             for action in tasktype["actions"]:
-                pass
+                if triggers(task, action["trigger"]):
+                    perform_action(task, action["action"])
+    if not __dry:
+        __todoist.commit()
 
 
 def main():
