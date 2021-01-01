@@ -12,6 +12,7 @@ import json
 from os import environ
 from datetime import datetime
 from todoist.api import TodoistAPI
+from jsonschema import validate
 
 
 __config = {}
@@ -22,10 +23,19 @@ __dry = True
 def load_config():
     """Load configuration from config file config.json."""
     global __config
+    schemafile = open("config.schema", "r")
+    schema = json.load(schemafile)
+    schemafile.close()
     filename = "config.json"
     print("Loading configuration file " + filename)
     with open(filename, "r") as config_file:
         __config = json.load(config_file)
+    try:
+        validate(schema, __config)
+        print("Successfully checked format of configuration file.")
+    except Exception as e:
+        print("Invalid configuration format: " + e.message)
+        raise
 
 
 def replace_names_in_config():

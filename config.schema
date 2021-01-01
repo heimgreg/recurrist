@@ -1,0 +1,81 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "tasks": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "filter": {
+            "type": "object",
+            "properties": {
+              "labels": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "project": {
+                "type": "string"
+              }
+            },
+            "minProperties": 1,
+            "additionalProperties": false
+          },
+          "actions": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "trigger": {
+                  "type": "object",
+                  "properties": {
+                    "days_since_creation": {
+                      "type": "number",
+                      "multipleOf": 1,
+                      "minimum": 0
+                    },
+                    "days_until_due": {
+                      "type": "number",
+                      "multipleOf": 1
+                    }
+                  },
+                  "minProperties": 1
+                },
+                "action": {
+                  "type": "object",
+                  "properties": {
+                    "add_label": {
+                      "type": "string"
+                    },
+                    "increase_priority": {
+                      "type": "number",
+                      "multipleOf": 1,
+                      "minimum": 1,
+                      "maximum": 4
+                    },
+                    "move_to_project": {
+                      "type": "string"
+                    }
+                  },
+                  "minProperties": 1
+                }
+              },
+              "required": ["trigger", "action"]
+            }
+          },
+          "recreate_when_completed": {
+            "type": "boolean"
+          },
+          "skip_label_on_recreate": {
+            "type": "string"
+          }
+        },
+        "required": ["filter", "actions", "recreate_when_completed"]
+      }
+    }
+  },
+  "required": ["tasks"],
+  "additionalProperties": false
+}
