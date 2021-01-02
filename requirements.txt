@@ -1,1 +1,4 @@
-todoist-python==8.1.2
+todoist_python==8.1.2
+jsonschema==3.2.0
+python_dateutil==2.8.1
+todoist==0.0.1
