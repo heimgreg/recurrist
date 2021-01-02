@@ -1,5 +1,21 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
+  "definitions": {
+    "label": {
+      "type": "string",
+      "pattern": "^[^\"@ ]+$"
+    },
+    "project": {
+      "type": "string",
+      "pattern": "^[^@#+=]+$"
+    },
+    "priority": {
+      "type": "number",
+      "multipleOf": 1,
+      "minimum": 1,
+      "maximum": 4
+    }
+  },
   "type": "object",
   "properties": {
     "tasks": {
@@ -13,11 +29,11 @@
               "labels": {
                 "type": "array",
                 "items": {
-                  "type": "string"
+                  "$ref": "#/definitions/label"
                 }
               },
               "project": {
-                "type": "string"
+                "$ref": "#/definitions/project"
               }
             },
             "minProperties": 1,
@@ -58,16 +74,13 @@
                   "type": "object",
                   "properties": {
                     "add_label": {
-                      "type": "string"
+                      "$ref": "#/definitions/label"
                     },
                     "increase_priority": {
-                      "type": "number",
-                      "multipleOf": 1,
-                      "minimum": 1,
-                      "maximum": 4
+                      "$ref": "#/definitions/priority"
                     },
                     "move_to_project": {
-                      "type": "string"
+                      "$ref": "#/definitions/project"
                     }
                   },
                   "minProperties": 1
@@ -80,7 +93,7 @@
             "type": "boolean"
           },
           "skip_label_on_recreate": {
-            "type": "string"
+            "$ref": "#/definitions/label"
           }
         },
         "required": ["filter", "actions", "recreate_when_completed"]
