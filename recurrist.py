@@ -14,7 +14,7 @@ from os import environ
 from datetime import datetime, date, timedelta
 from dateutil import parser
 from todoist.api import TodoistAPI
-from jsonschema import validate
+from jsonschema import validate, ValidationError, SchemaError
 
 
 __config = {}
@@ -23,22 +23,24 @@ __todoist = None
 __dry = False
 
 
-def load_config():
+def load_config(filename="config.json"):
     """Load configuration from config file config.json."""
     global __config
-    schemafile = open("config.schema", "r")
-    schema = json.load(schemafile)
-    schemafile.close()
-    filename = "config.json"
+    schema = None
+    with open("config.schema", "r") as schemafile:
+        schema = json.load(schemafile)
     __logger.debug("Loading configuration file " + filename)
     with open(filename, "r") as config_file:
         __config = json.load(config_file)
     try:
-        validate(schema, __config)
-        __logger.debug("Successfully checked format of configuration file.")
-    except Exception as e:
+        validate(schema=schema, instance=__config)
+    except ValidationError as e:
         __logger.error("Invalid configuration format: " + e.message)
-        raise
+        raise Exception("Failed to validate configuration schema")
+    except SchemaError as e:
+        __logger.error("Invalid schema file: " + e.message)
+        raise Exception("Failed to validate configuration schema")
+    __logger.debug("Successfully checked format of configuration file.")
 
 
 def replace_names_in_config():
@@ -122,8 +124,8 @@ def connect(token):
             raise Exception(syncres["error"])
         __logger.debug("Successfully synced with Todoist")
     except Exception as e:
-        __logger.error("Failed to sync with todoist: " + str(e))
-        raise
+        __logger.error(str(e))
+        raise Exception("Unable to connect to Todoist")
 
 
 def init_logger():
@@ -154,8 +156,8 @@ def init():
         connect(token)
         replace_names_in_config()
     except Exception as e:
-        __logger.error("Error while initializing Recurrist: " + str(e))
-        raise
+        __logger.error(str(e))
+        raise Exception("Error while initializing Recurrist")
     __logger.debug("Finished initialization")
 
 
@@ -238,10 +240,26 @@ def triggers(task, trigger):
     return False
 
 
+def commit():
+    """Commit changes."""
+    try:
+        commitres = __todoist.commit()
+        if 'error' in commitres:
+            raise Exception(commitres["error"])
+        __logger.debug("Committed successfully")
+    except Exception as e:
+        __logger.error(str(e))
+        raise Exception("Failed to commit")
+
+
 def recreate_completed_tasks():
     """Recreate task that were completed since last run."""
     last_run = read_time_of_last_run()
     current_time = datetime.utcnow()
+    if last_run is None:
+        __logger.warning(
+                "Could not load time of last run. Using current time.")
+        last_run = current_time
     completed = get_completed_items_since(last_run)
     num_recreated = 0
     for completed_task in completed:
@@ -272,15 +290,13 @@ def recreate_completed_tasks():
                     priority=prio,
                     labels=labels)
             num_recreated += 1
-    if not __dry and num_recreated > 0:
-        try:
-            commitres = __todoist.commit()
-            if 'error' in commitres:
-                raise Exception(commitres["error"])
-            __logger.debug("Committed successfully")
-        except Exception as e:
-            __logger.error("Failed to commit: " + str(e))
-            raise
+    if not __dry:
+        if num_recreated > 0:
+            try:
+                commit()
+            except Exception as e:
+                __logger.error(str(e))
+                raise Exception("Error while recreating completed tasks")
         write_time_of_last_run(current_time)
     __logger.info("Recreated " + str(num_recreated) + " tasks")
 
@@ -355,29 +371,36 @@ def update_tasks():
                     if triggers(task, action["trigger"]):
                         if perform_action(task, action["action"]):
                             updated = True
-            if updated: num_updated += 1
+            if updated:
+                num_updated += 1
     if not __dry and num_updated > 0:
         try:
-            commitres = __todoist.commit()
-            if 'error' in commitres:
-                raise Exception(commitres["error"])
-            __logger.debug("Committed successfully")
+            commit()
         except Exception as e:
-            __logger.error("Failed to commit: " + str(e))
-            raise
+            __logger.error(str(e))
+            raise Exception("Error while recreating completed tasks")
     __logger.info("Updated " + str(num_updated) + " tasks")
 
 
 def main():
     """Recurrist's main function."""
+    init_logger()
     try:
-        init_logger()
         init()
-        recreate_completed_tasks()
-        update_tasks()
-        return 0
-    except Exception:
+    except Exception as e:
+        __logger.error(str(e))
         return 1
+    if __dry:
+        __logger.warning("Dry run! No changes will be performed.")
+    try:
+        recreate_completed_tasks()
+    except Exception as e:
+        __logger.error(str(e))
+    try:
+        update_tasks()
+    except Exception as e:
+        __logger.error(str(e))
+    return 0
 
 
 if __name__ == '__main__':

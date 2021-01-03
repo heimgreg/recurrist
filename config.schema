@@ -88,7 +88,8 @@
                   "additionalProperties": false
                 }
               },
-              "required": ["trigger", "action"]
+              "required": ["trigger", "action"],
+              "additionalProperties": false
             }
           },
           "recreate_when_completed": {
@@ -101,7 +102,8 @@
             "$ref": "#/definitions/priority"
           }
         },
-        "required": ["filter", "recreate_when_completed"]
+        "required": ["filter", "recreate_when_completed"],
+        "additionalProperties": false
       }
     }
   },
