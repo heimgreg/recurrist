@@ -247,6 +247,7 @@ def recreate_completed_tasks():
     for completed_task in completed:
         recreate_task = False
         skip_label = None
+        prio = completed_task["priority"]
         for tasktype in __config["tasks"]:
             if not tasktype["recreate_when_completed"]:
                 continue
@@ -254,6 +255,8 @@ def recreate_completed_tasks():
                 recreate_task = True
                 if "skip_label_on_recreate" in tasktype.keys():
                     skip_label = tasktype["skip_label_on_recreate"]
+                if "set_priority_on_recreate" in tasktype.keys():
+                    prio = 5 - tasktype["set_priority_on_recreate"]
                 break
         if recreate_task:
             __logger.debug("Recreating task '"
@@ -266,6 +269,7 @@ def recreate_completed_tasks():
                     completed_task["content"],
                     project_id=completed_task["project_id"],
                     section_id=completed_task["section_id"],
+                    priority=prio,
                     labels=labels)
             num_recreated += 1
     if not __dry and num_recreated > 0:
@@ -345,11 +349,13 @@ def update_tasks():
         filt = make_filter(tasktype)
         tasks = __todoist.items.all(filt)
         for task in tasks:
+            updated = False
             if "actions" in tasktype.keys():
                 for action in tasktype["actions"]:
                     if triggers(task, action["trigger"]):
                         if perform_action(task, action["action"]):
-                            num_updated += 1
+                            updated = True
+            if updated: num_updated += 1
     if not __dry and num_updated > 0:
         try:
             commitres = __todoist.commit()

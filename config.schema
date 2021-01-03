@@ -96,6 +96,9 @@
           },
           "skip_label_on_recreate": {
             "$ref": "#/definitions/label"
+          },
+          "set_priority_on_recreate": {
+            "$ref": "#/definitions/priority"
           }
         },
         "required": ["filter", "recreate_when_completed"]
