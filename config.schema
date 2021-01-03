@@ -30,7 +30,8 @@
                 "type": "array",
                 "items": {
                   "$ref": "#/definitions/label"
-                }
+                },
+                "minItems": 1
               },
               "project": {
                 "$ref": "#/definitions/project"
@@ -83,7 +84,8 @@
                       "$ref": "#/definitions/project"
                     }
                   },
-                  "minProperties": 1
+                  "minProperties": 1,
+                  "additionalProperties": false
                 }
               },
               "required": ["trigger", "action"]
@@ -96,7 +98,7 @@
             "$ref": "#/definitions/label"
           }
         },
-        "required": ["filter", "actions", "recreate_when_completed"]
+        "required": ["filter", "recreate_when_completed"]
       }
     }
   },

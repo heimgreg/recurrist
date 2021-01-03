@@ -9,6 +9,7 @@ With this module, tasks in Todoist can be
 
 import sys
 import json
+import logging
 from os import environ
 from datetime import datetime, date, timedelta
 from dateutil import parser
@@ -17,8 +18,9 @@ from jsonschema import validate
 
 
 __config = {}
+__logger = None
 __todoist = None
-__dry = True
+__dry = False
 
 
 def load_config():
@@ -28,14 +30,14 @@ def load_config():
     schema = json.load(schemafile)
     schemafile.close()
     filename = "config.json"
-    print("Loading configuration file " + filename)
+    __logger.debug("Loading configuration file " + filename)
     with open(filename, "r") as config_file:
         __config = json.load(config_file)
     try:
         validate(schema, __config)
-        print("Successfully checked format of configuration file.")
+        __logger.debug("Successfully checked format of configuration file.")
     except Exception as e:
-        print("Invalid configuration format: " + e.message)
+        __logger.error("Invalid configuration format: " + e.message)
         raise
 
 
@@ -69,6 +71,11 @@ def replace_names_in_config():
                 if label is None:
                     unknown_label(action["action"]["add_label"])
                 action["action"]["add_label"] = label
+            if "move_to_project" in action["action"].keys():
+                proj = find_project_by_name(action["action"]["move_to_project"])
+                if proj is None:
+                    unknown_project(action["action"]["move_to_project"])
+                action["action"]["move_to_project"] = proj
         if "skip_label_on_recreate" in task.keys():
             label = find_label_by_name(task["skip_label_on_recreate"])
             if label is None:
@@ -105,30 +112,49 @@ def get_todoist_token():
 def connect(token):
     """Connect to Todoist API."""
     global __todoist
-    print("Connecting to Todoist API")
+    __logger.info("Connecting to Todoist API")
     __todoist = TodoistAPI(token)
     try:
         syncres = __todoist.sync()
         if 'error' in syncres:
             raise Exception(syncres["error"])
-        print("Successfully synced with Todoist")
+        __logger.debug("Successfully synced with Todoist")
     except Exception as e:
-        print("Failed to sync with todoist: " + str(e))
+        __logger.error("Failed to sync with todoist: " + str(e))
         raise
+
+
+def init_logger():
+    """Initialize log settings."""
+    global __logger
+    __logger = logging.getLogger("recurrist_log")
+    __logger.setLevel(logging.DEBUG)
+    chformatter = logging.Formatter(
+            '%(levelname)-8s %(module)s : %(message)s')
+    fhformatter = logging.Formatter(
+            '%(asctime)s %(levelname)-8s %(module)s : %(message)s')
+    ch = logging.StreamHandler()
+    ch.setLevel(logging.DEBUG)
+    ch.setFormatter(chformatter)
+    fh = logging.FileHandler("recurrist.log")
+    fh.setLevel(logging.DEBUG)
+    fh.setFormatter(fhformatter)
+    __logger.addHandler(ch)
+    __logger.addHandler(fh)
 
 
 def init():
     """Initialize Recurrist."""
-    print("Starting initialization")
+    __logger.debug("Starting initialization")
     try:
         load_config()
         token = get_todoist_token()
         connect(token)
         replace_names_in_config()
     except Exception as e:
-        print("Error while initializing Recurrist: " + str(e))
+        __logger.error("Error while initializing Recurrist: " + str(e))
         raise
-    print("Finished initialization")
+    __logger.debug("Finished initialization")
 
 
 def read_time_of_last_run():
@@ -160,10 +186,10 @@ def get_completed_items_since(time):
         raise TypeError('Expected datetime, got ' + type(time).__name__ + '.')
     completed = __todoist.completed.get_all(
             since=time.strftime("%Y-%m-%dT%H:%M"))
-    print("Found "
-          + str(len(completed["items"]))
-          + " completed tasks since "
-          + str(time))
+    __logger.debug("Found "
+                   + str(len(completed["items"]))
+                   + " completed tasks since "
+                   + str(time))
     tasks = []
     for task in completed["items"]:
         tasks.append(__todoist.items.get_by_id(task["task_id"]))
@@ -182,9 +208,11 @@ def matches(task, config):
     return True
 
 
-def make_filter(config):
+def make_filter(config, uncompleted=True):
     """Return filter function for finding tasks matching the config."""
     def filt(task):
+        if uncompleted:
+            return (matches(task, config) and task["checked"] == 0)
         return matches(task, config)
 
     return filt
@@ -213,6 +241,7 @@ def recreate_completed_tasks():
     last_run = read_time_of_last_run()
     current_time = datetime.utcnow()
     completed = get_completed_items_since(last_run)
+    num_recreated = 0
     for completed_task in completed:
         recreate_task = False
         skip_label = None
@@ -225,77 +254,119 @@ def recreate_completed_tasks():
                     skip_label = tasktype["skip_label_on_recreate"]
                 break
         if recreate_task:
-            print("Recreating task '" + completed_task["content"] + "'")
+            __logger.debug("Recreating task '"
+                           + completed_task["content"] + "'")
             labels = completed_task["labels"]
             if skip_label["id"] in labels:
                 labels.remove(skip_label["id"])
-                print("Skipping label '" + skip_label["name"] + "'")
-            new_task = __todoist.items.add(
+                __logger.debug("Skipping label '" + skip_label["name"] + "'")
+            __todoist.items.add(
                     completed_task["content"],
                     project_id=completed_task["project_id"],
                     section_id=completed_task["section_id"],
                     labels=labels)
-            print(new_task)
-    if not __dry:
+            num_recreated += 1
+    if not __dry and num_recreated > 0:
+        try:
+            commitres = __todoist.commit()
+            if 'error' in commitres:
+                raise Exception(commitres["error"])
+            __logger.debug("Committed successfully")
+        except Exception as e:
+            __logger.error("Failed to commit: " + str(e))
+            raise
         write_time_of_last_run(current_time)
-        __todoist.commit()
+    __logger.info("Recreated " + str(num_recreated) + " tasks")
 
 
 def perform_action(task, action):
     """Update task according to defined action."""
+    updated = False
     if "add_label" in action.keys():
         labels = task["labels"]
         if action["add_label"]["id"] not in labels:
             labels.append(action["add_label"]["id"])
-            print("Updating task '"
-                  + task["content"]
-                  + "': Adding label '"
-                  + action["add_label"]["id"]
-                  + "'.")
+            __logger.debug("Updating task '"
+                           + task["content"]
+                           + "': Adding label '"
+                           + action["add_label"]["name"]
+                           + "'.")
             task.update(labels=labels)
+            updated = True
         else:
-            print("Task '"
-                  + task["content"]
-                  + "' already has label '"
-                  + action["add_label"]["id"]
-                  + "'.")
+            __logger.debug("Task '"
+                           + task["content"]
+                           + "' already has label '"
+                           + action["add_label"]["name"]
+                           + "'.")
     if "increase_priority" in action.keys():
         current_prio = task["priority"]
         # p1 has value 4 in Todoist API
         new_prio = 5 - action["increase_priority"]
         if current_prio < new_prio:
-            print("Updating task '"
-                  + task["content"]
-                  + "': Increasing priority from p"
-                  + str(5 - current_prio)
-                  + " to p" + str(5 - new_prio) + ".")
+            __logger.debug("Updating task '"
+                           + task["content"]
+                           + "': Increasing priority from p"
+                           + str(5 - current_prio)
+                           + " to p" + str(5 - new_prio) + ".")
             task.update(priority=new_prio)
+            updated = True
         else:
-            print("Task '"
-                  + task["content"]
-                  + "' already has priority p"
-                  + str(5 - new_prio) + ".")
+            __logger.debug("Task '"
+                           + task["content"]
+                           + "' already has priority p"
+                           + str(5 - new_prio) + ".")
+    if "move_to_project" in action.keys():
+        current_proj = task["project_id"]
+        if current_proj != action["move_to_project"]["id"]:
+            print("vor log")
+            __logger.debug("Updating task '"
+                           + task["content"]
+                           + "': Moving to project '"
+                           + action["move_to_project"]["name"]
+                           + "'.")
+            task.update(project_id=action["move_to_project"]["id"])
+            updated = True
+        else:
+            __logger.debug("Task '"
+                           + task["content"]
+                           + "' already in project '"
+                           + action["move_to_project"]["name"]
+                           + "'.")
+    return updated
 
 
 def update_tasks():
     """Update tasks if a trigger matches."""
+    num_updated = 0
     for tasktype in __config["tasks"]:
         filt = make_filter(tasktype)
         tasks = __todoist.items.all(filt)
         for task in tasks:
             for action in tasktype["actions"]:
                 if triggers(task, action["trigger"]):
-                    perform_action(task, action["action"])
-    if not __dry:
-        __todoist.commit()
+                    if perform_action(task, action["action"]):
+                        num_updated += 1
+    if not __dry and num_updated > 0:
+        try:
+            commitres = __todoist.commit()
+            if 'error' in commitres:
+                raise Exception(commitres["error"])
+            __logger.debug("Committed successfully")
+        except Exception as e:
+            __logger.error("Failed to commit: " + str(e))
+            raise
+    __logger.info("Updated " + str(num_updated) + " tasks")
 
 
 def main():
     """Recurrist's main function."""
     try:
+        init_logger()
         init()
         recreate_completed_tasks()
         update_tasks()
+        return 0
     except Exception:
         return 1
 
