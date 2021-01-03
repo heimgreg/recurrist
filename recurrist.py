@@ -65,17 +65,19 @@ def replace_names_in_config():
             if project is None:
                 unknown_project(task["filter"]["project"])
             task["filter"]["project"] = project
-        for action in task["actions"]:
-            if "add_label" in action["action"].keys():
-                label = find_label_by_name(action["action"]["add_label"])
-                if label is None:
-                    unknown_label(action["action"]["add_label"])
-                action["action"]["add_label"] = label
-            if "move_to_project" in action["action"].keys():
-                proj = find_project_by_name(action["action"]["move_to_project"])
-                if proj is None:
-                    unknown_project(action["action"]["move_to_project"])
-                action["action"]["move_to_project"] = proj
+        if "actions" in task.keys():
+            for action in task["actions"]:
+                if "add_label" in action["action"].keys():
+                    label = find_label_by_name(action["action"]["add_label"])
+                    if label is None:
+                        unknown_label(action["action"]["add_label"])
+                    action["action"]["add_label"] = label
+                if "move_to_project" in action["action"].keys():
+                    proj = find_project_by_name(
+                            action["action"]["move_to_project"])
+                    if proj is None:
+                        unknown_project(action["action"]["move_to_project"])
+                    action["action"]["move_to_project"] = proj
         if "skip_label_on_recreate" in task.keys():
             label = find_label_by_name(task["skip_label_on_recreate"])
             if label is None:
@@ -257,7 +259,7 @@ def recreate_completed_tasks():
             __logger.debug("Recreating task '"
                            + completed_task["content"] + "'")
             labels = completed_task["labels"]
-            if skip_label["id"] in labels:
+            if skip_label is not None and skip_label["id"] in labels:
                 labels.remove(skip_label["id"])
                 __logger.debug("Skipping label '" + skip_label["name"] + "'")
             __todoist.items.add(
@@ -343,10 +345,11 @@ def update_tasks():
         filt = make_filter(tasktype)
         tasks = __todoist.items.all(filt)
         for task in tasks:
-            for action in tasktype["actions"]:
-                if triggers(task, action["trigger"]):
-                    if perform_action(task, action["action"]):
-                        num_updated += 1
+            if "actions" in tasktype.keys():
+                for action in tasktype["actions"]:
+                    if triggers(task, action["trigger"]):
+                        if perform_action(task, action["action"]):
+                            num_updated += 1
     if not __dry and num_updated > 0:
         try:
             commitres = __todoist.commit()
