@@ -284,12 +284,13 @@ def recreate_completed_tasks():
             if skip_label is not None and skip_label["id"] in labels:
                 labels.remove(skip_label["id"])
                 __logger.debug("Skipping label '" + skip_label["name"] + "'")
-            __todoist.items.add(
-                    completed_task["content"],
-                    project_id=completed_task["project_id"],
-                    section_id=completed_task["section_id"],
-                    priority=prio,
-                    labels=labels)
+            if not __dry:
+                __todoist.items.add(
+                        completed_task["content"],
+                        project_id=completed_task["project_id"],
+                        section_id=completed_task["section_id"],
+                        priority=prio,
+                        labels=labels)
             num_recreated += 1
     if not __dry:
         if num_recreated > 0:
@@ -314,7 +315,8 @@ def perform_action(task, action):
                            + "': Adding label '"
                            + action["add_label"]["name"]
                            + "'.")
-            task.update(labels=labels)
+            if not __dry:
+                task.update(labels=labels)
             updated = True
         else:
             __logger.debug("Task '"
@@ -332,7 +334,8 @@ def perform_action(task, action):
                            + "': Increasing priority from p"
                            + str(5 - current_prio)
                            + " to p" + str(5 - new_prio) + ".")
-            task.update(priority=new_prio)
+            if not __dry:
+                task.update(priority=new_prio)
             updated = True
         else:
             __logger.debug("Task '"
@@ -348,7 +351,8 @@ def perform_action(task, action):
                            + "': Moving to project '"
                            + action["move_to_project"]["name"]
                            + "'.")
-            task.update(project_id=action["move_to_project"]["id"])
+            if not __dry:
+                task.update(project_id=action["move_to_project"]["id"])
             updated = True
         else:
             __logger.debug("Task '"
@@ -387,10 +391,15 @@ def main():
     """Recurrist's main function."""
     parser = argparse.ArgumentParser()
     parser.add_argument('configfile', help='Configuration file in json format')
-    parser.add_argument('-d', '--debug', help='Enable debug output', action='store_true')
-    parser.add_argument('--dry-run', action='store_true', help='Do not perform any changes')
-    parser.add_argument('-l', '--log', metavar='logfile', default='recurrist.log', help='File name for logfile (default: recurrist.log)')
-    parser.add_argument('-t', '--token', metavar='TODOIST_TOKEN', help='Todoist API Token')
+    parser.add_argument('-d', '--debug', help='Enable debug output',
+                        action='store_true')
+    parser.add_argument('--dry-run', action='store_true',
+                        help='Do not perform any changes')
+    parser.add_argument('-l', '--log', metavar='logfile',
+                        default='recurrist.log',
+                        help='File name for logfile (default: recurrist.log)')
+    parser.add_argument('-t', '--token', metavar='TODOIST_TOKEN',
+                        help='Todoist API Token')
     args = parser.parse_args()
 
     init_logger(logfile=args.log, debug=args.debug)
