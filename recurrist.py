@@ -10,6 +10,7 @@ With this module, tasks in Todoist can be
 import sys
 import json
 import logging
+import argparse
 from os import environ
 from datetime import datetime, date, timedelta
 from dateutil import parser
@@ -23,7 +24,7 @@ __todoist = None
 __dry = False
 
 
-def load_config(filename="config.json"):
+def load_config(filename):
     """Load configuration from config file config.json."""
     global __config
     schema = None
@@ -128,31 +129,31 @@ def connect(token):
         raise Exception("Unable to connect to Todoist")
 
 
-def init_logger():
+def init_logger(logfile, debug):
     """Initialize log settings."""
     global __logger
+    loglevel = logging.DEBUG if debug else logging.INFO
     __logger = logging.getLogger("recurrist_log")
-    __logger.setLevel(logging.DEBUG)
+    __logger.setLevel(loglevel)
     chformatter = logging.Formatter(
             '%(levelname)-8s %(module)s : %(message)s')
     fhformatter = logging.Formatter(
             '%(asctime)s %(levelname)-8s %(module)s : %(message)s')
     ch = logging.StreamHandler()
-    ch.setLevel(logging.DEBUG)
     ch.setFormatter(chformatter)
-    fh = logging.FileHandler("recurrist.log")
-    fh.setLevel(logging.DEBUG)
+    fh = logging.FileHandler(logfile)
     fh.setFormatter(fhformatter)
     __logger.addHandler(ch)
     __logger.addHandler(fh)
 
 
-def init():
+def init(configfile, token):
     """Initialize Recurrist."""
     __logger.debug("Starting initialization")
     try:
-        load_config()
-        token = get_todoist_token()
+        load_config(configfile)
+        if token is None:
+            token = get_todoist_token()
         connect(token)
         replace_names_in_config()
     except Exception as e:
@@ -384,9 +385,19 @@ def update_tasks():
 
 def main():
     """Recurrist's main function."""
-    init_logger()
+    parser = argparse.ArgumentParser()
+    parser.add_argument('configfile', help='Configuration file in json format')
+    parser.add_argument('-d', '--debug', help='Enable debug output', action='store_true')
+    parser.add_argument('--dry-run', action='store_true', help='Do not perform any changes')
+    parser.add_argument('-l', '--log', metavar='logfile', default='recurrist.log', help='File name for logfile (default: recurrist.log)')
+    parser.add_argument('-t', '--token', metavar='TODOIST_TOKEN', help='Todoist API Token')
+    args = parser.parse_args()
+
+    init_logger(logfile=args.log, debug=args.debug)
+    __dry = args.dry_run
+
     try:
-        init()
+        init(configfile=args.configfile, token=args.token)
     except Exception as e:
         __logger.error(str(e))
         return 1
