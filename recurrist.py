@@ -107,10 +107,18 @@ def parse_todoist_datetime(timestring):
 
 
 def get_todoist_token():
-    """Load Todoist API token from environment variable TODOIST_TOKEN."""
-    token = environ.get('TODOIST_TOKEN')
+    """Load Todoist API token.
+
+    The token will be loaded from config or, if it is not set in config file,
+    from environment variable TODOIST_TOKEN.
+    """
+    token = None
+    if "todoist_token" in __config.keys():
+        token = __config["todoist_token"]
     if token is None:
-        raise Exception('Environment variable TODOIST_TOKEN not set!')
+        token = environ.get('TODOIST_TOKEN')
+    if token is None:
+        raise Exception('Todoist API token not set!')
     return token
 
 

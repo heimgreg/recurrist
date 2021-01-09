@@ -105,6 +105,9 @@
         "required": ["filter", "recreate_when_completed"],
         "additionalProperties": false
       }
+    },
+    "todoist_token": {
+      "type": "string"
     }
   },
   "required": ["tasks"],
