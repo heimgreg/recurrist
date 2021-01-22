@@ -286,8 +286,8 @@ def recreate_completed_tasks():
                     prio = 5 - tasktype["set_priority_on_recreate"]
                 break
         if recreate_task:
-            __logger.debug("Recreating task '"
-                           + completed_task["content"] + "'")
+            __logger.info("Recreating task '"
+                          + completed_task["content"] + "'")
             labels = completed_task["labels"]
             if skip_label is not None and skip_label["id"] in labels:
                 labels.remove(skip_label["id"])
@@ -318,11 +318,11 @@ def perform_action(task, action):
         labels = task["labels"]
         if action["add_label"]["id"] not in labels:
             labels.append(action["add_label"]["id"])
-            __logger.debug("Updating task '"
-                           + task["content"]
-                           + "': Adding label '"
-                           + action["add_label"]["name"]
-                           + "'.")
+            __logger.info("Updating task '"
+                          + task["content"]
+                          + "': Adding label '"
+                          + action["add_label"]["name"]
+                          + "'.")
             if not __dry:
                 task.update(labels=labels)
             updated = True
@@ -337,11 +337,11 @@ def perform_action(task, action):
         # p1 has value 4 in Todoist API
         new_prio = 5 - action["increase_priority"]
         if current_prio < new_prio:
-            __logger.debug("Updating task '"
-                           + task["content"]
-                           + "': Increasing priority from p"
-                           + str(5 - current_prio)
-                           + " to p" + str(5 - new_prio) + ".")
+            __logger.info("Updating task '"
+                          + task["content"]
+                          + "': Increasing priority from p"
+                          + str(5 - current_prio)
+                          + " to p" + str(5 - new_prio) + ".")
             if not __dry:
                 task.update(priority=new_prio)
             updated = True
@@ -353,12 +353,11 @@ def perform_action(task, action):
     if "move_to_project" in action.keys():
         current_proj = task["project_id"]
         if current_proj != action["move_to_project"]["id"]:
-            print("vor log")
-            __logger.debug("Updating task '"
-                           + task["content"]
-                           + "': Moving to project '"
-                           + action["move_to_project"]["name"]
-                           + "'.")
+            __logger.info("Updating task '"
+                          + task["content"]
+                          + "': Moving to project '"
+                          + action["move_to_project"]["name"]
+                          + "'.")
             if not __dry:
                 task.update(project_id=action["move_to_project"]["id"])
             updated = True
