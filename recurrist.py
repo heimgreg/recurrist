@@ -137,10 +137,8 @@ def init_logger(logfile, debug):
     loglevel = logging.DEBUG if debug else logging.INFO
     __logger = logging.getLogger("recurrist_log")
     __logger.setLevel(loglevel)
-    chformatter = logging.Formatter(
-            '%(levelname)-8s %(module)s : %(message)s')
-    fhformatter = logging.Formatter(
-            '%(asctime)s %(levelname)-8s %(module)s : %(message)s')
+    chformatter = logging.Formatter('%(levelname)-8s %(module)s : %(message)s')
+    fhformatter = logging.Formatter('%(asctime)s %(levelname)-8s %(module)s : %(message)s')
     ch = logging.StreamHandler()
     ch.setFormatter(chformatter)
     fh = logging.FileHandler(logfile)
@@ -192,8 +190,7 @@ def get_completed_items_since(time):
     """Return list of completed tasks since given timestamp."""
     if not isinstance(time, datetime):
         raise TypeError('Expected datetime, got ' + type(time).__name__ + '.')
-    completed = __todoist.completed.get_all(
-            since=time.strftime("%Y-%m-%dT%H:%M"))
+    completed = __todoist.completed.get_all(since=time.strftime("%Y-%m-%dT%H:%M"))
     __logger.debug("Found "
                    + str(len(completed["items"]))
                    + " completed tasks since "
@@ -230,15 +227,13 @@ def triggers(task, trigger):
     """Check if task matches trigger conditions."""
     if "days_since_creation" in trigger.keys():
         creation = parse_todoist_datetime(task["date_added"])
-        trigger_date = creation.date() + timedelta(
-                days=trigger["days_since_creation"])
+        trigger_date = creation.date() + timedelta(days=trigger["days_since_creation"])
         if date.today() >= trigger_date:
             return True
     if "days_until_due" in trigger.keys():
         if task["due"] is not None:
             due = parse_todoist_datetime(task["due"]["date"])
-            trigger_date = due.date() - timedelta(
-                    days=trigger["days_until_due"])
+            trigger_date = due.date() - timedelta(days=trigger["days_until_due"])
             if date.today() >= trigger_date:
                 return True
     return False
@@ -261,8 +256,7 @@ def recreate_completed_tasks():
     last_run = read_time_of_last_run()
     current_time = datetime.utcnow()
     if last_run is None:
-        __logger.warning(
-                "Could not load time of last run. Using current time.")
+        __logger.warning("Could not load time of last run. Using current time.")
         last_run = current_time
     completed = get_completed_items_since(last_run)
     num_recreated = 0
@@ -281,19 +275,17 @@ def recreate_completed_tasks():
                     prio = 5 - tasktype["set_priority_on_recreate"]
                 break
         if recreate_task:
-            __logger.info("Recreating task '"
-                          + completed_task["content"] + "'")
+            __logger.info("Recreating task '" + completed_task["content"] + "'")
             labels = completed_task["labels"]
             if skip_label is not None and skip_label["id"] in labels:
                 labels.remove(skip_label["id"])
                 __logger.debug("Skipping label '" + skip_label["name"] + "'")
             if not __dry:
-                __todoist.items.add(
-                        completed_task["content"],
-                        project_id=completed_task["project_id"],
-                        section_id=completed_task["section_id"],
-                        priority=prio,
-                        labels=labels)
+                __todoist.items.add(completed_task["content"],
+                                    project_id=completed_task["project_id"],
+                                    section_id=completed_task["section_id"],
+                                    priority=prio,
+                                    labels=labels)
             num_recreated += 1
     if not __dry:
         if num_recreated > 0:
@@ -393,15 +385,11 @@ def main():
     """Recurrist's main function."""
     parser = argparse.ArgumentParser()
     parser.add_argument('configfile', help='Configuration file in json format')
-    parser.add_argument('-d', '--debug', help='Enable debug output',
-                        action='store_true')
-    parser.add_argument('--dry-run', action='store_true',
-                        help='Do not perform any changes')
-    parser.add_argument('-l', '--log', metavar='logfile',
-                        default='recurrist.log',
+    parser.add_argument('-d', '--debug', help='Enable debug output', action='store_true')
+    parser.add_argument('--dry-run', action='store_true', help='Do not perform any changes')
+    parser.add_argument('-l', '--log', metavar='logfile', default='recurrist.log',
                         help='File name for logfile (default: recurrist.log)')
-    parser.add_argument('-t', '--token', metavar='TODOIST_TOKEN',
-                        help='Todoist API Token')
+    parser.add_argument('-t', '--token', metavar='TODOIST_TOKEN', help='Todoist API Token')
     args = parser.parse_args()
 
     init_logger(logfile=args.log, debug=args.debug)
