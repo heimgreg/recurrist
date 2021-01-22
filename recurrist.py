@@ -44,48 +44,42 @@ def load_config(filename):
     __logger.debug("Successfully checked format of configuration file.")
 
 
-def replace_names_in_config():
+def __replace_name_by_object(key, name):
     """Find labels and projects and store them.
 
     The string from the configuration are replaced by
     their equivalent todoist objects.
     """
-    def unknown_label(name):
-        raise Exception("Unknown label '" + name + "' in configuration!")
+    labelkeys = ["labels", "add_label", "skip_label_on_recreate"]
+    projectkeys = ["project", "move_to_project"]
+    if key in labelkeys:
+        label = find_label_by_name(name)
+        if label is None:
+            raise Exception("Unknown label '" + name + "' in configuration!")
+        return label
+    if key in projectkeys:
+        proj = find_project_by_name(name)
+        if proj is None:
+            raise Exception("Unknown project '" + name + "' in configuration!")
+        return proj
+    return name
 
-    def unknown_project(name):
-        raise Exception("Unknown project '" + name + "' in configuration!")
 
-    for task in __config["tasks"]:
-        if "labels" in task["filter"].keys():
-            for i in range(len(task["filter"]["labels"])):
-                label = find_label_by_name(task["filter"]["labels"][i])
-                if label is None:
-                    unknown_label(task["filter"]["labels"][i])
-                task["filter"]["labels"][i] = label
-        if "project" in task["filter"].keys():
-            project = find_project_by_name(task["filter"]["project"])
-            if project is None:
-                unknown_project(task["filter"]["project"])
-            task["filter"]["project"] = project
-        if "actions" in task.keys():
-            for action in task["actions"]:
-                if "add_label" in action["action"].keys():
-                    label = find_label_by_name(action["action"]["add_label"])
-                    if label is None:
-                        unknown_label(action["action"]["add_label"])
-                    action["action"]["add_label"] = label
-                if "move_to_project" in action["action"].keys():
-                    proj = find_project_by_name(
-                            action["action"]["move_to_project"])
-                    if proj is None:
-                        unknown_project(action["action"]["move_to_project"])
-                    action["action"]["move_to_project"] = proj
-        if "skip_label_on_recreate" in task.keys():
-            label = find_label_by_name(task["skip_label_on_recreate"])
-            if label is None:
-                unknown_label(task["skip_label_on_recreate"])
-            task["skip_label_on_recreate"] = label
+def replace_names_by_objects_in_dict(d):
+    """Iterate through dict to replace label and project name by the objects."""
+    for key, value in d.items():
+        if isinstance(value, dict):
+            d[key] = replace_names_by_objects_in_dict(value)
+        elif isinstance(value, list):
+            for i in range(len(value)):
+                if isinstance(value[i], dict):
+                    value[i] = replace_names_by_objects_in_dict(value[i])
+                else:
+                    value[i] = __replace_name_by_object(key, value[i])
+            d[key] = value
+        else:
+            d[key] = __replace_name_by_object(key, value)
+    return d
 
 
 def find_label_by_name(name):
@@ -163,7 +157,8 @@ def init(configfile, token):
         if token is None:
             token = get_todoist_token()
         connect(token)
-        replace_names_in_config()
+        global __config
+        __config = replace_names_by_objects_in_dict(__config)
     except Exception as e:
         __logger.error(str(e))
         raise Exception("Error while initializing Recurrist")
