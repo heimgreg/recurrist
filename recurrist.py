@@ -377,7 +377,7 @@ def update_tasks():
             commit()
         except Exception as e:
             __logger.error(str(e))
-            raise Exception("Error while recreating completed tasks")
+            raise Exception("Error while updating tasks")
     __logger.info("Updated " + str(num_updated) + " tasks")
 
 
