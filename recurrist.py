@@ -137,7 +137,7 @@ def init_logger(logfile, debug):
     """Initialize log settings."""
     global __logger
     loglevel = logging.DEBUG if debug else logging.INFO
-    __logger = logging.getLogger(str(__path) + "/recurrist_log")
+    __logger = logging.getLogger("recurrist_log")
     __logger.setLevel(loglevel)
     chformatter = logging.Formatter('%(levelname)-8s %(module)s : %(message)s')
     fhformatter = logging.Formatter('%(asctime)s %(levelname)-8s %(module)s : %(message)s')
@@ -389,8 +389,8 @@ def main():
     parser.add_argument('configfile', help='Configuration file in json format')
     parser.add_argument('-d', '--debug', help='Enable debug output', action='store_true')
     parser.add_argument('--dry-run', action='store_true', help='Do not perform any changes')
-    parser.add_argument('-l', '--log', metavar='logfile', default='recurrist.log',
-                        help='File name for logfile (default: recurrist.log)')
+    parser.add_argument('-l', '--log', metavar='logfile', default=str(__path) + '/recurrist.log',
+                        help='File name for logfile (default: ' + str(__path) + '/recurrist.log)')
     parser.add_argument('-t', '--token', metavar='TODOIST_TOKEN', help='Todoist API Token')
     args = parser.parse_args()
 
