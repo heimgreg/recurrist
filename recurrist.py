@@ -23,14 +23,14 @@ __config = {}
 __logger = None
 __todoist = None
 __dry = False
+__path = Path(__file__).parent
 
 
 def load_config(filename):
     """Load configuration from config file config.json."""
     global __config
     schema = None
-    path = Path(__file__).parent
-    with open(str(path) + "/config.schema", "r") as schemafile:
+    with open(str(__path) + "/config.schema", "r") as schemafile:
         schema = json.load(schemafile)
     __logger.debug("Loading configuration file " + filename)
     with open(filename, "r") as config_file:
@@ -169,7 +169,7 @@ def read_time_of_last_run():
     """Read timestamp of last run from file."""
     content = None
     try:
-        with open("lastrun.json", "r") as fh:
+        with open(str(__path) + "/lastrun.json", "r") as fh:
             content = json.load(fh)
     except Exception:
         pass
@@ -184,7 +184,7 @@ def write_time_of_last_run(time):
         raise TypeError('Expected datetime, got ' + type(time).__name__ + '.')
     content = {}
     content['last_run'] = time.isoformat()
-    with open("lastrun.json", "w") as fh:
+    with open(str(__path) + "/lastrun.json", "w") as fh:
         json.dump(content, fh)
 
 
