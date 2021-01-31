@@ -137,7 +137,7 @@ def init_logger(logfile, debug):
     """Initialize log settings."""
     global __logger
     loglevel = logging.DEBUG if debug else logging.INFO
-    __logger = logging.getLogger("recurrist_log")
+    __logger = logging.getLogger(str(__path) + "/recurrist_log")
     __logger.setLevel(loglevel)
     chformatter = logging.Formatter('%(levelname)-8s %(module)s : %(message)s')
     fhformatter = logging.Formatter('%(asctime)s %(levelname)-8s %(module)s : %(message)s')
