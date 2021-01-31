@@ -12,6 +12,7 @@ import json
 import logging
 import argparse
 from os import environ
+from pathlib import Path
 from datetime import datetime, date, timedelta
 from dateutil import parser
 from todoist.api import TodoistAPI
@@ -28,7 +29,8 @@ def load_config(filename):
     """Load configuration from config file config.json."""
     global __config
     schema = None
-    with open("config.schema", "r") as schemafile:
+    path = Path(__file__).parent
+    with open(str(path) + "/config.schema", "r") as schemafile:
         schema = json.load(schemafile)
     __logger.debug("Loading configuration file " + filename)
     with open(filename, "r") as config_file:
